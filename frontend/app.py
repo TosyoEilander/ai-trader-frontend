@@ -71,19 +71,34 @@ def _resolve_db_path() -> str:
     if env_path and os.path.exists(env_path):
         return env_path
 
-    # 2. 自动检测兄弟项目
-    candidates = [
-        PROJECT_ROOT.parent / "blue" / "output" / "results" / "bench_v2_weekD.db",
-        PROJECT_ROOT.parent / "blue" / "output" / "results" / "benchmark.db",
-        PROJECT_ROOT.parent / "red" / "output" / "results" / "benchmark.db",
-        PROJECT_ROOT / "output" / "results" / "benchmark.db",
-    ]
-    for cand in candidates:
-        if cand.exists():
-            return str(cand)
+    # 2. 自动检测 — blue 项目自身的输出
+    runs_dir = PROJECT_ROOT / "artifacts" / "runs"
+    legacy_dir = PROJECT_ROOT / "output" / "results"
+
+    # 优先: artifacts/runs/ 下最新的 .db 文件
+    if runs_dir.exists():
+        db_files = sorted(
+            runs_dir.glob("*.db"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        for db in db_files:
+            if db.stat().st_size > 0:
+                return str(db)
+
+    # 次选: output/results/ 下的文件
+    if legacy_dir.exists():
+        db_files = sorted(
+            legacy_dir.glob("*.db"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        for db in db_files:
+            if db.stat().st_size > 0:
+                return str(db)
 
     # 3. 默认路径（即使不存在也返回，DataLayer 会给出友好提示）
-    default = PROJECT_ROOT.parent / "blue" / "output" / "results" / "benchmark.db"
+    default = PROJECT_ROOT / "artifacts" / "runs" / "benchmark.db"
     return str(default)
 
 DB_PATH = _resolve_db_path()
