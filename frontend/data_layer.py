@@ -67,6 +67,13 @@ class DataLayer:
         available = self._get_columns(table)
         return [c for c in desired if c in available]
 
+    def _ensure_cols(self, df: pd.DataFrame, defaults: dict[str, object]) -> pd.DataFrame:
+        """为 DataFrame 填充缺失列（默认值）。"""
+        for col, default in defaults.items():
+            if col not in df.columns:
+                df[col] = default
+        return df
+
     def _query(self, sql: str, params: tuple = ()) -> pd.DataFrame:
         """执行查询并返回 DataFrame。"""
         return pd.read_sql_query(sql, self.conn, params=params)
@@ -98,7 +105,17 @@ class DataLayer:
 
         cols_str = ", ".join(cols)
         sql = f"SELECT {cols_str} FROM benchmark_runs {where} ORDER BY created_at DESC"
-        return self._query(sql, params)
+        df = self._query(sql, params)
+        # Fill missing enhanced columns with defaults (blue v3.1 compatibility)
+        df = self._ensure_cols(df, {
+            "api_cost_total": 0.0, "trading_fees_total": 0.0,
+            "slippage_total": 0.0, "total_cost": 0.0,
+            "total_prompt_tokens": 0, "total_completion_tokens": 0,
+            "avg_latency_ms": 0.0, "tokens_per_decision": 0.0,
+            "cost_per_decision": 0.0, "return_per_dollar_cost": 0.0,
+            "result": "{}",
+        })
+        return df
 
     def get_all_runs_brief(self) -> pd.DataFrame:
         """获取所有运行（含运行中）的简要信息。"""
@@ -111,9 +128,15 @@ class DataLayer:
         cols = self._safe_cols("benchmark_runs", desired)
         if not cols:
             return pd.DataFrame()
-        return self._query(
+        df = self._query(
             f"SELECT {', '.join(cols)} FROM benchmark_runs ORDER BY created_at DESC"
         )
+        df = self._ensure_cols(df, {
+            "api_cost_total": 0.0, "total_cost": 0.0,
+            "avg_latency_ms": 0.0, "tokens_per_decision": 0.0,
+            "cost_per_decision": 0.0, "return_per_dollar_cost": 0.0,
+        })
+        return df
 
     def get_run_detail(self, run_id: str) -> dict:
         """获取单次运行的完整详情。"""
@@ -365,9 +388,20 @@ class DataLayer:
         cols = self._safe_cols("tool_calls", desired)
         if not cols:
             return pd.DataFrame()
+
+        # Build ORDER BY dynamically based on available columns (blue vs red schema)
+        order_parts = ["decision_timestamp"]
+        if "round_num" in cols:
+            order_parts.append("round_num")
+        if "id" in cols:
+            order_parts.append("id")
+        elif "tool_call_id" in self._get_columns("tool_calls"):
+            order_parts.append("tool_call_id")
+
+        order_clause = ", ".join(order_parts)
         return self._query(
             f"SELECT {', '.join(cols)} FROM tool_calls "
-            f"WHERE run_id = ? ORDER BY decision_timestamp, round_num, id",
+            f"WHERE run_id = ? ORDER BY {order_clause}",
             (run_id,),
         )
 
