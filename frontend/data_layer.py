@@ -253,11 +253,16 @@ class DataLayer:
         cols = self._safe_cols("trades", desired)
         if not cols:
             return pd.DataFrame()
-        return self._query(
+        df = self._query(
             f"SELECT {', '.join(cols)} FROM trades "
             f"WHERE run_id = ? ORDER BY timestamp",
             (run_id,),
         )
+        df = self._ensure_cols(df, {
+            "realized_pnl": 0.0, "realized_pnl_pct": 0.0,
+            "holding_minutes": 0, "rejection_code": "",
+        })
+        return df
 
     def get_completed_trades(self, run_id: str) -> pd.DataFrame:
         """仅获取已完成的卖出交易（含 P&L）。"""
@@ -269,12 +274,17 @@ class DataLayer:
         cols = self._safe_cols("trades", desired)
         if not cols:
             return pd.DataFrame()
-        return self._query(
+        df = self._query(
             f"SELECT {', '.join(cols)} FROM trades "
             f"WHERE run_id = ? AND side = 'sell' AND success = 1 "
             f"ORDER BY timestamp",
             (run_id,),
         )
+        df = self._ensure_cols(df, {
+            "realized_pnl": 0.0, "realized_pnl_pct": 0.0,
+            "holding_minutes": 0, "rejection_code": "",
+        })
+        return df
 
     def get_trade_pnl_summary(self, run_id: str) -> pd.DataFrame:
         """按市场汇总 P&L。"""
