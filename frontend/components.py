@@ -379,28 +379,35 @@ def drawdown_chart(df_nav: pd.DataFrame, title: str = "Drawdown") -> go.Figure:
 
 def position_timeline(df_trades: pd.DataFrame, title: str = "Position Timeline") -> go.Figure:
     """Build a Gantt-style position timeline."""
-    # Match buys with sells
+    if "side" not in df_trades.columns or df_trades.empty:
+        fig = go.Figure()
+        fig.add_annotation(text="No trade data", xref="paper", yref="paper",
+                          x=0.5, y=0.5, showarrow=False)
+        fig.update_layout(height=200, template="plotly_white")
+        return fig
+
     buys = df_trades[df_trades["side"] == "buy"].copy()
     sells = df_trades[df_trades["side"] == "sell"].copy()
 
     positions = []
     for _, sell in sells.iterrows():
         sym = sell["symbol"]
-        market = sell["market"]
+        market = sell.get("market", "")
         sell_ts = sell["timestamp"]
-        # Find matching buy
         matching_buys = buys[
             (buys["symbol"] == sym) &
             (buys["timestamp"] < sell_ts)
         ]
         if not matching_buys.empty:
             buy = matching_buys.iloc[-1]
+            pnl_pct = sell.get("realized_pnl_pct", 0) or 0
+            pnl = sell.get("realized_pnl", 0) or 0
             positions.append({
                 "symbol": f"{sym} ({market})",
                 "buy_time": buy["timestamp"],
                 "sell_time": sell["timestamp"],
-                "pnl_pct": sell["realized_pnl_pct"],
-                "pnl": sell["realized_pnl"],
+                "pnl_pct": pnl_pct,
+                "pnl": pnl,
                 "market": market,
             })
 
