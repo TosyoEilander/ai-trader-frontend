@@ -1,16 +1,17 @@
 """
 Data layer for AI-Trader Benchmark Frontend.
 ============================================
-所有数据库查询集中在此。每个函数接受可选的 model 参数筛选模型，
-新增模型无需修改此层 — 只需从 UI 传入不同 model 名。
+All database queries are centralized here. Each function accepts an optional
+model filter — adding a new model requires zero changes to this layer.
 
-返回 pandas DataFrames，供 Streamlit / Plotly 直接使用。
+Returns pandas DataFrames for direct use in Streamlit/Plotly.
 
-兼容性:
-  同时兼容 red 项目（v2）和 blue 项目（v3）的数据库 schema。
-  查询时自动检测可用列，缺失列返回默认值而不报错。
+Compatibility:
+  Compatible with both red (v2) and blue (v3) backend database schemas.
+  Automatically detects available columns on read; missing columns get
+  default values rather than causing errors.
 
-用法:
+Usage:
     from frontend.data_layer import DataLayer
     dl = DataLayer("path/to/benchmark.db")
     df = dl.get_runs_summary(model="deepseek-v4-pro")
@@ -23,7 +24,7 @@ from pathlib import Path
 
 
 class DataLayer:
-    """集中式数据访问层，为前端提供所有数据。"""
+    """Centralized data access layer for the benchmark frontend."""
 
     def __init__(self, db_path: str):
         self._db_path = db_path
@@ -48,12 +49,12 @@ class DataLayer:
             self._schema_cache = {}
 
     def reload(self):
-        """关闭并重新打开（用于轮询实时更新）。"""
+        """Close and reopen (for polling live updates)."""
         self.close()
         return self.conn
 
     def _get_columns(self, table: str) -> set[str]:
-        """获取表的列名集合（缓存）。"""
+        """Get column names for a table (cached)."""
         if table not in self._schema_cache:
             try:
                 rows = self.conn.execute(f"PRAGMA table_info({table})").fetchall()
@@ -63,19 +64,19 @@ class DataLayer:
         return self._schema_cache[table]
 
     def _safe_cols(self, table: str, desired: list[str]) -> list[str]:
-        """返回 desired 中实际存在于 table 的列名列表。"""
+        """Return columns from desired that actually exist in the table."""
         available = self._get_columns(table)
         return [c for c in desired if c in available]
 
     def _ensure_cols(self, df: pd.DataFrame, defaults: dict[str, object]) -> pd.DataFrame:
-        """为 DataFrame 填充缺失列（默认值）。"""
+        """Fill missing columns in DataFrame with default values."""
         for col, default in defaults.items():
             if col not in df.columns:
                 df[col] = default
         return df
 
     def _query(self, sql: str, params: tuple = ()) -> pd.DataFrame:
-        """执行查询并返回 DataFrame。"""
+        """Run a query and return a DataFrame."""
         return pd.read_sql_query(sql, self.conn, params=params)
 
     # ------------------------------------------------------------------
@@ -83,7 +84,7 @@ class DataLayer:
     # ------------------------------------------------------------------
 
     def get_runs_summary(self, model: str | None = None) -> pd.DataFrame:
-        """获取所有已完成运行的摘要，按最近优先排列。"""
+        """Get summary of all completed runs, most recent first."""
         cols = self._safe_cols("benchmark_runs", [
             "run_id", "model", "start_date", "end_date", "interval_min",
             "initial_cash", "thinking_enabled", "status", "decisions_made",
@@ -118,7 +119,7 @@ class DataLayer:
         return df
 
     def get_all_runs_brief(self) -> pd.DataFrame:
-        """获取所有运行（含运行中）的简要信息。"""
+        """Get brief info for all runs including running ones."""
         desired = [
             "run_id", "model", "start_date", "end_date", "status",
             "decisions_made", "current_nav", "total_trades", "successful_trades",
@@ -139,14 +140,14 @@ class DataLayer:
         return df
 
     def get_run_detail(self, run_id: str) -> dict:
-        """获取单次运行的完整详情。"""
+        """Get full detail for a single run."""
         row = self.conn.execute(
             "SELECT * FROM benchmark_runs WHERE run_id = ?", (run_id,)
         ).fetchone()
         return dict(row) if row else {}
 
     def get_run_list(self, model: str | None = None) -> list[str]:
-        """获取运行 ID 列表（最新优先）。"""
+        """Get list of run IDs for a model, newest first."""
         where = ""
         params: tuple = ()
         if model:
@@ -158,7 +159,7 @@ class DataLayer:
         return [r["run_id"] for r in rows]
 
     def get_available_models(self) -> list[str]:
-        """获取数据库中所有不重复的模型名称。"""
+        """Get distinct model names from the database."""
         rows = self.conn.execute(
             "SELECT DISTINCT model FROM benchmark_runs ORDER BY model"
         ).fetchall()
@@ -169,7 +170,7 @@ class DataLayer:
     # ------------------------------------------------------------------
 
     def get_nav_series(self, run_id: str) -> pd.DataFrame:
-        """获取 NAV 时间序列（含基准和指数）。"""
+        """Get NAV time series with benchmark and index."""
         desired = [
             "timestamp", "nav", "cash", "benchmark_nav", "index_nav",
             "positions", "market_exposure",
@@ -188,7 +189,7 @@ class DataLayer:
     # ------------------------------------------------------------------
 
     def get_decisions(self, run_id: str) -> pd.DataFrame:
-        """获取所有决策（含市场背景）。"""
+        """Get all decisions for a run with market context."""
         desired = [
             "id", "timestamp", "action", "trades", "reason", "portfolio_nav",
             "market_regime", "index_1h_pct", "index_1d_pct", "positions_before",
@@ -204,7 +205,7 @@ class DataLayer:
         )
 
     def get_trade_decisions(self, run_id: str) -> pd.DataFrame:
-        """仅获取含交易的决策。"""
+        """Get only trade decisions (action=trade)."""
         desired = [
             "timestamp", "trades", "reason", "portfolio_nav",
             "market_regime", "index_1h_pct", "index_1d_pct",
@@ -219,7 +220,7 @@ class DataLayer:
         )
 
     def get_decisions_by_regime(self, run_id: str) -> pd.DataFrame:
-        """按市场状态聚合决策统计。"""
+        """Get aggregated decision stats by market regime."""
         if "market_regime" not in self._get_columns("decisions"):
             return pd.DataFrame()
         return self._query("""
@@ -244,7 +245,7 @@ class DataLayer:
     # ------------------------------------------------------------------
 
     def get_trades(self, run_id: str) -> pd.DataFrame:
-        """获取所有交易记录。"""
+        """Get all trades for a run."""
         desired = [
             "id", "timestamp", "symbol", "market", "side", "quantity",
             "price", "cost", "fees", "success", "error", "rejection_code",
@@ -253,19 +254,14 @@ class DataLayer:
         cols = self._safe_cols("trades", desired)
         if not cols:
             return pd.DataFrame()
-        df = self._query(
+        return self._query(
             f"SELECT {', '.join(cols)} FROM trades "
             f"WHERE run_id = ? ORDER BY timestamp",
             (run_id,),
         )
-        df = self._ensure_cols(df, {
-            "realized_pnl": 0.0, "realized_pnl_pct": 0.0,
-            "holding_minutes": 0, "rejection_code": "",
-        })
-        return df
 
     def get_completed_trades(self, run_id: str) -> pd.DataFrame:
-        """仅获取已完成的卖出交易（含 P&L）。"""
+        """Get only completed sell trades with P&L."""
         desired = [
             "id", "timestamp", "symbol", "market", "side", "quantity",
             "price", "cost", "fees", "buy_timestamp", "holding_minutes",
@@ -274,20 +270,15 @@ class DataLayer:
         cols = self._safe_cols("trades", desired)
         if not cols:
             return pd.DataFrame()
-        df = self._query(
+        return self._query(
             f"SELECT {', '.join(cols)} FROM trades "
             f"WHERE run_id = ? AND side = 'sell' AND success = 1 "
             f"ORDER BY timestamp",
             (run_id,),
         )
-        df = self._ensure_cols(df, {
-            "realized_pnl": 0.0, "realized_pnl_pct": 0.0,
-            "holding_minutes": 0, "rejection_code": "",
-        })
-        return df
 
     def get_trade_pnl_summary(self, run_id: str) -> pd.DataFrame:
-        """按市场汇总 P&L。"""
+        """Get P&L summary by market."""
         if "realized_pnl" not in self._get_columns("trades"):
             return pd.DataFrame()
         return self._query("""
@@ -305,7 +296,7 @@ class DataLayer:
         """, (run_id,))
 
     def get_rejection_summary(self, run_id: str) -> pd.DataFrame:
-        """获取交易拒绝汇总。"""
+        """Get trade rejection summary."""
         if "rejection_code" not in self._get_columns("trades"):
             # Fallback: use error field
             return self._query("""
@@ -332,7 +323,7 @@ class DataLayer:
     # ------------------------------------------------------------------
 
     def get_llm_calls(self, run_id: str) -> pd.DataFrame:
-        """获取所有 LLM 调用记录。"""
+        """Get all LLM calls for a run."""
         desired = [
             "id", "decision_timestamp", "round_num", "model",
             "prompt_tokens", "completion_tokens", "total_tokens",
@@ -348,7 +339,7 @@ class DataLayer:
         )
 
     def get_llm_round_summary(self, run_id: str) -> pd.DataFrame:
-        """按轮次聚合 LLM 调用统计。"""
+        """Get LLM call stats aggregated by round number."""
         if "round_num" not in self._get_columns("llm_calls"):
             return pd.DataFrame()
         return self._query("""
@@ -368,7 +359,7 @@ class DataLayer:
         """, (run_id,))
 
     def get_token_timeline(self, run_id: str) -> pd.DataFrame:
-        """获取 Token 用量时间线。"""
+        """Get token usage over time for trend analysis."""
         if "decision_timestamp" not in self._get_columns("llm_calls"):
             return pd.DataFrame()
         return self._query("""
@@ -389,7 +380,7 @@ class DataLayer:
     # ------------------------------------------------------------------
 
     def get_tool_calls(self, run_id: str) -> pd.DataFrame:
-        """获取所有工具调用记录。"""
+        """Get all tool calls for a run."""
         desired = [
             "id", "decision_timestamp", "round_num", "tool_name",
             "tool_args", "tool_result_summary", "latency_ms",
@@ -416,7 +407,7 @@ class DataLayer:
         )
 
     def get_tool_usage_summary(self, run_id: str) -> pd.DataFrame:
-        """获取工具使用频率汇总。"""
+        """Get aggregated tool usage stats."""
         if "tool_name" not in self._get_columns("tool_calls"):
             return pd.DataFrame()
         return self._query("""
@@ -432,7 +423,7 @@ class DataLayer:
         """, (run_id,))
 
     def get_tool_calls_by_round(self, run_id: str) -> pd.DataFrame:
-        """按轮次拆分工具调用。"""
+        """Get tool call counts broken down by round."""
         if "round_num" not in self._get_columns("tool_calls"):
             return pd.DataFrame()
         return self._query("""
@@ -452,7 +443,7 @@ class DataLayer:
     # ------------------------------------------------------------------
 
     def get_agent_rounds(self, run_id: str) -> pd.DataFrame:
-        """获取所有 agent 轮次记录。"""
+        """Get all agent rounds."""
         desired = [
             "id", "decision_timestamp", "round_num", "action",
             "llm_response", "tool_results", "latency_ms",
@@ -471,7 +462,7 @@ class DataLayer:
     # ------------------------------------------------------------------
 
     def get_model_comparison(self) -> pd.DataFrame:
-        """获取模型级别的聚合对比指标。"""
+        """Get aggregated metrics per model for comparison."""
         return self._query("""
             SELECT
                 model,
@@ -490,7 +481,7 @@ class DataLayer:
     # ------------------------------------------------------------------
 
     def get_run_package(self, run_id: str, model: str | None = None) -> dict[str, pd.DataFrame]:
-        """一键获取单次运行的完整数据包。
+        """Return a dict of all DataFrames for a single-run deep dive.
 
         Keys: nav, decisions, trades, completed_trades, llm_calls, tool_calls,
               tool_summary, token_timeline, rejection_summary, round_summary,
