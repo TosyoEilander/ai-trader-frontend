@@ -1,26 +1,27 @@
 """
 AI-Trader Benchmark — Streamlit Frontend
 =========================================
-Mint Green 主仓库 (https://github.com/Mint-green/llm-trading-benchmark) 对应前端。
+Frontend for Mint Green main repository (https://github.com/Mint-green/llm-trading-benchmark).
 
-入口: streamlit run frontend/app.py
+Entry: streamlit run frontend/app.py
 
-6 个页面:
-  1. Model Comparison Dashboard  — 模型对比总览
-  2. Single Run Detail           — 单次回测详情
-  3. Decision Process Analytics  — 决策过程分析
-  4. Cost & Efficiency Analytics — 成本与效率
-  5. Trade Pair Analysis         — 交易对分析
-  6. Experiment Manager          — 实验管理
+6 pages:
+  1. Model Comparison Dashboard
+  2. Single Run Detail
+  3. Decision Process Analytics
+  4. Cost & Efficiency Analytics
+  5. Trade Pair Analysis
+  6. Experiment Manager
 
-架构:
-  - data_layer.py  : 所有 SQL 查询 → pandas DataFrames
-  - components.py  : 可复用图表、KPI 卡片、样式表格
-  - page_modules/* : 各页面独立渲染器
+Architecture:
+  - data_layer.py  : All SQL queries → pandas DataFrames
+  - components.py  : Reusable charts, KPI cards, styled tables
+  - page_modules/* : Individual page renderers
 
-对接后端:
-  前端只读 SQLite 数据库。后端项目（如 blue）在回测时将数据写入
-  SQLite 表，前端通过 DataLayer 读取展示。详见 HOW_TO_CONNECT.md
+Backend integration:
+  The frontend reads from SQLite databases only. Backend projects (e.g. blue)
+  write data to SQLite tables during backtesting; the frontend reads via
+  DataLayer. See HOW_TO_CONNECT.md for details.
 """
 
 from __future__ import annotations
@@ -29,14 +30,14 @@ import sys
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# 项目根目录（AI-Trader-Frontend/）
+# Project root (AI-Trader-Frontend/)
 # ---------------------------------------------------------------------------
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 import streamlit as st
 
-# Page config — 必须第一个 Streamlit 调用
+# Page config — must be the first Streamlit call
 st.set_page_config(
     page_title="AI-Trader Benchmark",
     page_icon=":chart_with_upwards_trend:",
@@ -55,27 +56,27 @@ from frontend.page_modules.page5_trades import render as render_page5
 from frontend.page_modules.page6_experiment import render as render_page6
 
 # ---------------------------------------------------------------------------
-# 数据库路径配置
+# Database path resolution
 # ---------------------------------------------------------------------------
-# 优先级: 环境变量 > 自动检测 > 默认路径
+# Priority: env variable > auto-detect > default path
 #
-# 自动检测顺序:
-#   1. ../blue/output/results/bench_v2_weekD.db   (blue 项目)
-#   2. ../red/output/results/benchmark.db          (red 项目)
-#   3. ./output/results/benchmark.db               (本地)
+# Auto-detect order:
+#   1. PROJECT_ROOT/artifacts/runs/*.db   (newest non-empty .db)
+#   2. PROJECT_ROOT/output/results/*.db   (legacy)
+#   3. Fallback default
 
 def _resolve_db_path() -> str:
-    """智能解析数据库路径。"""
-    # 1. 环境变量优先
+    """Smart database path detection."""
+    # 1. Environment variable takes priority
     env_path = os.environ.get("BENCHMARK_DB_PATH")
     if env_path and os.path.exists(env_path):
         return env_path
 
-    # 2. 自动检测 — blue 项目自身的输出
+    # 2. Auto-detect — blue project's own output
     runs_dir = PROJECT_ROOT / "artifacts" / "runs"
     legacy_dir = PROJECT_ROOT / "output" / "results"
 
-    # 优先: artifacts/runs/ 下最新的 .db 文件
+    # Priority: newest .db file under artifacts/runs/
     if runs_dir.exists():
         db_files = sorted(
             runs_dir.glob("*.db"),
@@ -86,7 +87,7 @@ def _resolve_db_path() -> str:
             if db.stat().st_size > 0:
                 return str(db)
 
-    # 次选: output/results/ 下的文件
+    # Fallback: output/results/ files
     if legacy_dir.exists():
         db_files = sorted(
             legacy_dir.glob("*.db"),
@@ -97,7 +98,7 @@ def _resolve_db_path() -> str:
             if db.stat().st_size > 0:
                 return str(db)
 
-    # 3. 默认路径（即使不存在也返回，DataLayer 会给出友好提示）
+    # 3. Default path (may not exist yet; DataLayer will show a friendly hint)
     default = PROJECT_ROOT / "artifacts" / "runs" / "benchmark.db"
     return str(default)
 
@@ -106,12 +107,12 @@ DB_PATH = _resolve_db_path()
 
 @st.cache_resource
 def get_data_layer() -> DataLayer:
-    """获取或创建 DataLayer 单例。"""
+    """Get or create the DataLayer singleton."""
     return DataLayer(DB_PATH)
 
 
 # ---------------------------------------------------------------------------
-# 页面路由
+# Page routing
 # ---------------------------------------------------------------------------
 
 PAGE_MAP = {
@@ -125,24 +126,24 @@ PAGE_MAP = {
 
 
 # ---------------------------------------------------------------------------
-# 侧边栏
+# Sidebar
 # ---------------------------------------------------------------------------
 
 def render_sidebar():
-    """渲染侧边栏：导航 + 全局筛选器。"""
+    """Render sidebar: navigation + global filters."""
     st.sidebar.title("AI-Trader Benchmark")
 
-    # 数据库状态
+    # Database status
     st.sidebar.caption(f"DB: `{DB_PATH}`")
     if not os.path.exists(DB_PATH):
         st.sidebar.warning(
-            "数据库文件未找到！\n\n"
-            "请设置环境变量 `BENCHMARK_DB_PATH` 指向你的 benchmark.db，\n"
-            "或运行一次回测生成数据。\n\n"
-            "详见 `HOW_TO_CONNECT.md`"
+            "Database file not found!\n\n"
+            "Set `BENCHMARK_DB_PATH` env variable to your benchmark.db,\n"
+            "or run a backtest to generate data.\n\n"
+            "See `HOW_TO_CONNECT.md`"
         )
 
-    # 导航
+    # Navigation
     selected = st.sidebar.radio(
         "Navigation",
         list(PAGE_MAP.keys()),
@@ -152,7 +153,7 @@ def render_sidebar():
 
     st.sidebar.markdown("---")
 
-    # 模型筛选
+    # Model filter
     dl = get_data_layer()
     try:
         models = dl.get_available_models()
@@ -161,7 +162,7 @@ def render_sidebar():
 
     model_count = len(models)
     if model_count == 0:
-        st.sidebar.info("暂无模型数据")
+        st.sidebar.info("No model data available")
     elif model_count == 1:
         st.sidebar.info(f"1 model: **{models[0]}**")
     else:
@@ -173,21 +174,21 @@ def render_sidebar():
             "Model Filter",
             options=["All (compare)"] + models,
             index=0,
-            help="'All' = 多模型对比。选单个模型可深入查看其回测。",
+            help="'All' = compare all models side by side. Select one model to drill into its runs.",
         )
         if selected_model.startswith("All"):
             selected_model = None
 
     st.sidebar.markdown("---")
     st.sidebar.caption(
-        "**如何添加新模型：**\n\n"
-        "用新模型跑一次回测即可：\n"
+        "**How to add a new model:**\n\n"
+        "Run a backtest with the new model:\n"
         "`python runners/run_backtest.py --model qwen-max ...`\n\n"
-        "自动出现在这里 — 无需改前端代码。"
+        "It appears here automatically — no code changes needed."
     )
     st.sidebar.markdown("---")
     st.sidebar.caption(
-        "Mint Green 主仓库前端 | [GitHub]"
+        "Mint Green Main Repo Frontend | [GitHub]"
         "(https://github.com/Mint-green/llm-trading-benchmark)"
     )
 
