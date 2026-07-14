@@ -1,108 +1,108 @@
 # AI-Trader Benchmark Frontend
 
-**Mint Green 主仓库** (`https://github.com/Mint-green/llm-trading-benchmark`) 对应的前端可视化面板。
+Frontend dashboard for the **Mint Green main repository** (`https://github.com/Mint-green/llm-trading-benchmark`).
 
-基于 Streamlit + Plotly，提供 6 个分析页面，支持多模型对比。
+Built with Streamlit + Plotly. 6 analysis pages, multi-model comparison support.
 
 ---
 
-## 快速开始
+## Quick Start
 
 ```bash
-# 1. 安装依赖
+# 1. Install dependencies
 pip install -r requirements.txt
 
-# 2. 启动前端
+# 2. Launch frontend
 streamlit run frontend/app.py
 
-# 3. 浏览器打开 http://localhost:8501
+# 3. Open http://localhost:8501 in browser
 ```
 
-**首次启动前**，确保有一个回测产出的 `benchmark.db` 文件。最简方式：
+**Before first launch**, make sure you have a `benchmark.db` file from a backtest run:
 
 ```bash
-# 将前端放在 blue 同级目录，前端会自动检测
+# Place this folder next to blue/ — it auto-detects the DB
 ls ~/Desktop/
 # AI-Trader-Frontend/   blue/   red/   ...
 
-# 或手动指定:
+# Or specify manually:
 export BENCHMARK_DB_PATH=~/Desktop/blue/output/results/benchmark.db
 ```
 
 ---
 
-## 页面一览
+## Pages
 
-| 页面 | 功能 | 需要的数据表 |
+| Page | Description | Tables Required |
 |------|------|------------|
-| **1. Model Comparison** | 多模型 KPI 卡片、雷达图、成本-收益散点图、对比表格 | benchmark_runs |
-| **2. Single Run Detail** | NAV 曲线、回撤图、持仓甘特图、市场敞口、交易日志 | portfolio_snapshots, trades |
-| **3. Decision Analytics** | 决策时间线、工具调用分布、Token 用量、延迟分布、市场状态分析 | decisions, llm_calls, tool_calls, agent_rounds |
-| **4. Cost & Efficiency** | 成本构成、效率排行榜、Token 效率、延迟深度分析 | benchmark_runs, llm_calls |
-| **5. Trade Analysis** | P&L 分布、持仓时长 vs 盈亏散点、胜率分段、盈亏瀑布图 | trades |
-| **6. Experiment Manager** | 回测配置表单、运行队列、实时日志、结果预览 | benchmark_runs |
+| **1. Model Comparison** | Multi-model KPI cards, radar chart, cost-return scatter, comparison table | benchmark_runs |
+| **2. Single Run Detail** | NAV curve, drawdown chart, position Gantt, market exposure, trade log | portfolio_snapshots, trades |
+| **3. Decision Analytics** | Decision timeline, tool usage distribution, token usage, latency, regime analysis | decisions, llm_calls, tool_calls, agent_rounds |
+| **4. Cost & Efficiency** | Cost composition, efficiency leaderboard, token efficiency, latency deep-dive | benchmark_runs, llm_calls |
+| **5. Trade Analysis** | P&L distribution, holding period vs P&L scatter, win rate segments, P&L waterfall | trades |
+| **6. Experiment Manager** | Backtest config form, run queue, live log, results preview | benchmark_runs |
 
 ---
 
-## 目录结构
+## Directory Structure
 
 ```
 AI-Trader-Frontend/
 ├── .streamlit/
-│   └── config.toml          # Streamlit 服务端配置
+│   └── config.toml          # Streamlit server config
 ├── frontend/
-│   ├── app.py               # 主入口，DB_PATH 配置，侧边栏导航
-│   ├── data_layer.py        # 所有 SQL 查询集中管理，返回 pandas DataFrame
-│   ├── components.py        # 可复用组件：KPI 卡片、Plotly 图表、Morandi 样式
-│   └── page_modules/        # 6 个独立页面渲染器
-│       ├── page1_overview.py      # 模型对比总览
-│       ├── page2_detail.py        # 单次回测详情
-│       ├── page3_decisions.py     # 决策过程分析
-│       ├── page4_efficiency.py    # 成本与效率
-│       ├── page5_trades.py        # 交易对分析
-│       └── page6_experiment.py    # 实验管理
-├── requirements.txt         # Python 依赖
-├── HOW_TO_CONNECT.md        # 后端对接完整指南（必读）
-└── README.md                # 本文件
+│   ├── app.py               # Main entry, DB_PATH config, sidebar nav
+│   ├── data_layer.py        # All SQL queries, returns pandas DataFrames
+│   ├── components.py        # Reusable: KPI cards, Plotly charts, Morandi theme
+│   └── page_modules/        # 6 individual page renderers
+│       ├── page1_overview.py      # Model Comparison Dashboard
+│       ├── page2_detail.py        # Single Run Detail
+│       ├── page3_decisions.py     # Decision Process Analytics
+│       ├── page4_efficiency.py    # Cost & Efficiency Analytics
+│       ├── page5_trades.py        # Trade Pair Analysis
+│       └── page6_experiment.py    # Experiment Manager
+├── requirements.txt         # Python dependencies
+├── HOW_TO_CONNECT.md        # Backend integration guide (required reading)
+└── README.md                # This file
 ```
 
 ---
 
-## 数据流
+## Data Flow
 
 ```
-后端 (blue/red)                 SQLite DB                  前端 (本文件夹)
-───────────────                ──────────                  ────────────────
-ExperimentLogger               benchmark.db               DataLayer
-  .init_run()         ──写入──▶ benchmark_runs    ◀──读取──  .get_runs_summary()
-  .log_llm_call()     ──写入──▶ llm_calls        ◀──读取──  .get_llm_calls()
-  .log_tool_call()    ──写入──▶ tool_calls       ◀──读取──  .get_tool_calls()
-  .log_decision()     ──写入──▶ decisions        ◀──读取──  .get_decisions()
-  .log_trade()        ──写入──▶ trades           ◀──读取──  .get_trades()
-  .log_snapshot()     ──写入──▶ portfolio_snapshots ◀──读取── .get_nav_series()
-  .log_round()        ──写入──▶ agent_rounds     ◀──读取──  .get_agent_rounds()
+Backend (blue/red)               SQLite DB                  Frontend (this folder)
+─────────────────                ──────────                 ──────────────────────
+ExperimentLogger                 benchmark.db               DataLayer
+  .init_run()         ──write──▶ benchmark_runs    ◀──read──  .get_runs_summary()
+  .log_llm_call()     ──write──▶ llm_calls        ◀──read──  .get_llm_calls()
+  .log_tool_call()    ──write──▶ tool_calls       ◀──read──  .get_tool_calls()
+  .log_decision()     ──write──▶ decisions        ◀──read──  .get_decisions()
+  .log_trade()        ──write──▶ trades           ◀──read──  .get_trades()
+  .log_snapshot()     ──write──▶ portfolio_snapshots ◀──read── .get_nav_series()
+  .log_round()        ──write──▶ agent_rounds     ◀──read──  .get_agent_rounds()
 ```
 
-前后端完全解耦，只通过 7 张 SQLite 表的结构约定通信。
+Frontend and backend are fully decoupled — communication happens only through the 7-table SQLite schema.
 
 ---
 
-## 对接你的后端项目
+## Connecting Your Backend
 
-详细说明见 **[HOW_TO_CONNECT.md](./HOW_TO_CONNECT.md)**，包含：
+See **[HOW_TO_CONNECT.md](./HOW_TO_CONNECT.md)** for:
 
-- 数据流全链路（从 ExperimentRunner → SQLite → 前端页面）
-- 7 张核心表的完整字段说明
-- 4 种 DB 路径配置方式
-- blue 项目兼容性矩阵
-- 可选的增强列 SQL（提升前端展示效果）
-- 多项目对比方案
+- Full data flow (from ExperimentRunner → SQLite → frontend pages)
+- Complete field reference for 7 core tables
+- 4 DB path configuration methods
+- Blue project compatibility matrix
+- Optional enhancement column SQL (improves frontend display)
+- Multi-project comparison setup
 
 ---
 
-## 添加新模型
+## Adding a New Model
 
-无需改前端代码。用新模型跑回测后自动出现：
+No frontend code changes needed. Run a backtest with the new model and it appears automatically:
 
 ```bash
 cd ~/Desktop/blue
@@ -111,29 +111,29 @@ python runners/run_backtest.py --model qwen-max --start 2026-02-03 --end 2026-03
 
 ---
 
-## 技术栈
+## Tech Stack
 
-- **Streamlit** — Python 数据面板框架
-- **Plotly** — 交互式图表（支持缩放、平移、hover 提示）
-- **Pandas** — 数据处理
-- **SQLite** — 数据存储（前后端共享）
+- **Streamlit** — Python data dashboard framework
+- **Plotly** — Interactive charts (zoom, pan, hover tooltips)
+- **Pandas** — Data processing
+- **SQLite** — Data storage (shared between frontend and backend)
 
 ---
 
-## 配色
+## Color Palette
 
-采用 **Morandi 色系** — 低饱和度、灰调底色，适合长时间盯盘分析：
+**Morandi color scheme** — low saturation, gray undertones, suitable for extended analysis sessions:
 
-| 颜色 | 用途 |
+| Color | Usage |
 |------|------|
-| `#7b8fa1` 灰蓝 | 主色调、US 市场 |
-| `#8aa38a` 鼠尾草绿 | 盈利、HK 市场 |
-| `#b8907a` 陶土色 | 亏损、CN 市场 |
-| `#c4a882` 暖灰褐 | CRYPTO、警告 |
-| `#f3f0ec` 暖米白 | 背景色 |
+| `#7b8fa1` Dusty Blue | Primary, US market |
+| `#8aa38a` Sage Green | Profit, HK market |
+| `#b8907a` Terracotta | Loss, CN market |
+| `#c4a882` Warm Taupe | CRYPTO, warnings |
+| `#f3f0ec` Warm Off-White | Background |
 
 ---
 
-## 许可
+## License
 
-Mint Green 主仓库项目。本前端文件夹为本地使用，不推送至 GitHub。
+Mint Green main repository project. This frontend folder is for local use.
