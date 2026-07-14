@@ -339,7 +339,7 @@ python merge_databases.py \
     artifacts/gpt-5.5/run_20260101_20260228.db
 ```
 
-The merged `all_models.db` will contain all four runs. Launch the frontend pointing to it:
+The merged `all_models.db` will contain all runs. Launch the frontend pointing to it:
 
 ```bash
 BENCHMARK_DB_PATH=artifacts/runs/all_models.db streamlit run frontend/app.py
