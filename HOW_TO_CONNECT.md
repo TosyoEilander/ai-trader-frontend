@@ -317,25 +317,45 @@ The new model run_id is automatically written to the benchmark_runs table and ap
 
 ---
 
-## Comparing Multiple Backend Projects Simultaneously
+## Multi-Model Comparison (Merging Databases)
 
-If blue and red each have their own benchmark.db, the simplest approach is to place them in one directory:
+To compare multiple models (e.g. deepseek, mimo, qwen, gpt) on the same charts, you need to merge their individual result databases into one.
+
+### How It Works
+
+Each model backtest produces an independent `.db` file with the same table schema but different `run_id` values. The merge script copies all rows from each source DB into a single merged DB, skipping auto-increment `id` columns (so SQLite assigns new IDs) and using `INSERT OR IGNORE` for TEXT primary key tables to avoid duplicates.
+
+The frontend then reads this single merged DB and displays all models in the sidebar dropdown for comparison on Page 1 (radar chart, comparison table, cost-return scatter).
+
+### Using merge_databases.py
 
 ```bash
-mkdir -p ~/Desktop/benchmark_results
-cp ~/Desktop/blue/output/results/benchmark.db ~/Desktop/benchmark_results/blue_benchmark.db
-cp ~/Desktop/red/output/results/benchmark.db ~/Desktop/benchmark_results/red_benchmark.db
+# Basic usage: first DB is the schema base, rest are merged in
+python merge_databases.py \
+    --output artifacts/runs/all_models.db \
+    artifacts/deepseek-v4-pro/run_20260101_20260228.db \
+    artifacts/mimo-v2.5-pro/run_20260101_20260228.db \
+    artifacts/qwen3.6-max/run_20260101_20260228.db \
+    artifacts/gpt-5.5/run_20260101_20260228.db
 ```
 
-Then launch two frontend instances (different ports):
+The merged `all_models.db` will contain all four runs. Launch the frontend pointing to it:
 
 ```bash
-# Terminal 1 — View blue
-BENCHMARK_DB_PATH=~/Desktop/benchmark_results/blue_benchmark.db streamlit run frontend/app.py --server.port 8501
-
-# Terminal 2 — View red
-BENCHMARK_DB_PATH=~/Desktop/benchmark_results/red_benchmark.db streamlit run frontend/app.py --server.port 8502
+BENCHMARK_DB_PATH=artifacts/runs/all_models.db streamlit run frontend/app.py
 ```
+
+Or place it in `artifacts/runs/` and the frontend auto-detects it.
+
+### Notes
+
+- The **first** database provides the base schema — use the one with the most complete tables
+- Model names in `benchmark_runs` should be unique per run (e.g. `deepseek-v4-pro`, not `qwen-flash`)
+- If model names need fixing after merge, use `sqlite3` directly:
+  ```sql
+  UPDATE benchmark_runs SET model = 'qwen3.6-max' WHERE model = 'qwen-flash';
+  UPDATE llm_calls SET model = 'qwen3.6-max' WHERE model = 'qwen-flash';
+  ```
 
 ---
 
